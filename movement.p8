@@ -104,6 +104,7 @@ end
 
 function change_gravity(new_g)
  g_dir = new_g
+ jumping = true
 end
 
 function apply_gravity()
