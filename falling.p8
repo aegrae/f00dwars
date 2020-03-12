@@ -1,30 +1,36 @@
 pico-8 cartridge // http://www.pico-8.com
 version 18
 __lua__
-x = 64
-y = 0
-y_vel = 0
-gravity = 2
-g = -7
+fps=2
+fruits = {}
+fall_speed=fps
+num_fruits = 12
 f_types=3
 
+function _init()
+ for i=1,num_fruits do
+  fruits[i] = {rnd(f_types),rnd(128),0-rnd(64)} 
+ end
+end
+
 function _update()
-  gen_stuff()
-  if y >= 127 then y=0 end
+  cls()
+	 for i,v in pairs(fruits) do
+	   p_y = v[2] 
+   	if p_y>=127 then 
+    	 v[2]=0 
+    	 v[1]=rnd(128)
+    	 v[0]=rnd(f_types)
+   	else 
+    	 v[2]=p_y+fall_speed 
+   	end
+  end
 end
 
 function _draw()
-  cls()
-  spr(0,x,y)
-  spr(1,x+10,y+8)
-end
-
-function gen_stuff()
- spr(rnd(f_types),x-rnd(64),y)
-end
-
-function fall(s)
-  y=y+1
+  for i,v in pairs(fruits) do 
+  	spr(v[0],v[1],v[2])
+  end
 end
 __gfx__
 00000b0000ffff000033330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
