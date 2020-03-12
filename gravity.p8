@@ -3,9 +3,15 @@ version 18
 __lua__
 x = 64
 y = 64
-vel = 0
-gravity = 3
-g = -1
+x_vel = 0
+y_vel = 0
+g_dir = 3
+g = -0.3
+
+x_min = 0
+x_max = 127 - 8
+y_min = 0
+y_max = 127 - 8
 
 function _update()
  change_gravity()
@@ -18,10 +24,10 @@ function _draw()
 end
 
 function change_gravity()
-	if btnp(0) then gravity=0 end
-	if btnp(1) then gravity=1 end
-	if btnp(2) then gravity=2 end
-	if btnp(3) then gravity=3 end
+	if btnp(0) then g_dir=0 end
+	if btnp(1) then g_dir=1 end
+	if btnp(2) then g_dir=2 end
+	if btnp(3) then g_dir=3 end
 	if btnp(0) or
 	   btnp(1) or
 	   btnp(2) or
@@ -31,18 +37,37 @@ function change_gravity()
 end
 
 function apply_gravity()
-	vel = vel + g
- if gravity == 0 then
-  x = x + vel
+ if g_dir == 0 then
+  x_vel = x_vel + g
  end
- if gravity == 1 then
-  x = x - vel
+ if g_dir == 1 then
+  x_vel = x_vel - g
  end
- if gravity == 2 then
-  y = y + vel
+ if g_dir == 2 then
+  y_vel = y_vel + g
  end
- if gravity == 3 then
-  y = y - vel
+ if g_dir == 3 then
+  y_vel = y_vel - g
+ end
+ 
+ x = x + x_vel
+ y = y + y_vel
+ 
+ if x < x_min then
+  x = x_min
+  x_vel = 0
+ end
+ if x > x_max then
+  x = x_max
+  x_vel = 0
+ end
+ if y < y_min then
+  y = y_min
+  y_vel = 0
+ end
+ if y > y_max then
+  y = y_max
+  y_vel = 0
  end
 end
 __gfx__
