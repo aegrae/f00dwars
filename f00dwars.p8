@@ -6,6 +6,7 @@ __lua__
 
 --constants
 g = -0.3
+f_coeff = 0.85
 move_speed = 2
 x_min = 1
 x_max = 127 - 8
@@ -32,7 +33,7 @@ down = 3
 player = {}
 fruits = {}
 
-g_dir = up
+g_dir = down
 
 frames_alive = 0
 game_over = false
@@ -86,7 +87,7 @@ end
 function initialize_globals()
  frames_alive = 0
  fruits = {}
- g_dir = 3
+ g_dir = down
  game_over = false
 end
 
@@ -96,7 +97,8 @@ function initialize_player()
  player.x_vel = 0
  player.y_vel = 0
  player.health = max_health
- player.jumping = true
+ player.jumping = false
+ player.grounded = false
  player.invuln_timer = 0
  player.heal_timer = 0
 end
@@ -242,24 +244,43 @@ function movement_input()
   player.y_vel = 0
   player.y = player.y + move_speed
  end
- if btnp(4) and not player.jumping then
-  jump(jump_vel)
+ if player.jumping and not btn(4) then
+  cut_jump()
+ end
+ if btnp(4) and player.grounded then
+  jump()
  end
 end
 
-function jump(vel)
+function jump()
  player.jumping = true
+ player.grounded = false
  if g_dir == left then
-  player.x_vel = vel
+  player.x_vel = jump_vel
  end
  if g_dir == right then
-  player.x_vel = -vel
+  player.x_vel = -jump_vel
  end
  if g_dir == up then
-  player.y_vel = vel
+  player.y_vel = jump_vel
  end
  if g_dir == down then
-  player.y_vel = -vel
+  player.y_vel = -jump_vel
+ end 
+end
+
+function cut_jump()
+ if g_dir == left and player.x_vel > 0 then
+  player.x_vel = 0
+ end
+ if g_dir == right and player.x_vel < 0 then
+  player.x_vel = 0
+ end
+ if g_dir == up and player.y_vel > 0 then
+  player.y_vel = 0
+ end
+ if g_dir == down and player.y_vel < 0 then
+  player.y_vel = 0
  end 
 end
 
@@ -284,30 +305,38 @@ function apply_gravity()
   player.x = x_min
   player.x_vel = 0
   if g_dir == left then
-   player.jumping = false
+   land()
   end
  end
  if player.x > x_max then
   player.x = x_max
   player.x_vel = 0
   if g_dir == right then
-   player.jumping = false
+   land()
   end
  end
  if player.y < y_min then
   player.y = y_min
   player.y_vel = 0
   if g_dir == up then
-   player.jumping = false
+   land()
   end
  end
  if player.y > y_max then
   player.y = y_max
   player.y_vel = 0
   if g_dir == down then
-   player.jumping = false
+   land()
   end
  end
+end
+
+function land()
+ player.grounded = true
+ player.jumping = false
+ -- friction
+ player.x_vel = player.x_vel * f_coeff
+ player.y_vel = player.y_vel * f_coeff
 end
 
 function fruits_fall()
@@ -353,6 +382,7 @@ function eat_fruit(fruit)
  fruit.eaten = true
  if fruit.type <= down then
   g_dir = fruit.type
+  player.grounded = false
  end
 end
 
