@@ -29,26 +29,36 @@ right = 1
 up = 2
 down = 3
 
+title = 0
+game = 1
+game_over = 2
+
+scene = title
+
 --globals
-player = {}
+players = {}
 fruits = {}
 
 g_dir = down
 
+n_players = 1
+winner = 0
+
 frames_alive = 0
-game_over = false
 
 
 function _init()
  music(0)
- restart()
+ go_to_main_menu()
 end
 
 function _update()
- if game_over then
+ if scene == title then
+  choose_mode()
+ elseif scene == game_over then
   wait_for_key(5)
- else
-  movement_input()
+ elseif scene == game then
+  movement_inputs()
   apply_gravity()
   fruits_fall()
   check_collisions()
@@ -59,28 +69,70 @@ end
 
 function _draw()
  cls()
- if game_over then
-  score = flr(frames_alive / 30)
-  print("you survived "..score.." seconds")
-  print("press x to restart")
- else
+ if scene == title then
+  draw_mode_select()
+ elseif scene == game_over then
+  draw_game_over()
+ elseif scene == game then
   draw_border()
-  draw_health()
   draw_center_arrow()
   draw_fruits()
-  draw_player()
+  draw_players()
+  draw_health()
  end
+end
+
+function choose_mode()
+ if btnp(up) then
+  n_players = 1
+ end
+ if btnp(down) then
+  n_players = 2
+ end
+ if btnp(5) then
+  start_game()
+ end
+end
+
+function draw_mode_select()
+ draw_border()
+ print("f00dwars", 48, 16, 7)
+ print("choose mode", 42, 24)
+ print("(press x to select)", 26, 32)
+ print("1 player", 48, 60)
+ print("2 player", 48, 68)
+ if n_players == 1 then
+  print(">", 40, 60)
+ else
+  print(">", 40, 68)
+ end
+end
+
+function draw_game_over()
+ draw_border()
+ if n_players == 1 then
+  score = flr(frames_alive / 30)
+  print("you survived "..score.." seconds", 16, 16, 7)
+ else
+  print("player "..winner.." wins!", 36, 16, 7)
+ end
+ print("press x to restart", 28, 24)
 end
 
 function wait_for_key(key)
  if btn(key) then
-  restart()
+  go_to_main_menu()
  end
 end
 
-function restart()
+function go_to_main_menu()
+ scene = title
+end
+
+function start_game()
+ scene = game
  initialize_globals()
- initialize_player()
+ initialize_players()
  initialize_fruits()
 end
 
@@ -88,19 +140,28 @@ function initialize_globals()
  frames_alive = 0
  fruits = {}
  g_dir = down
- game_over = false
 end
 
-function initialize_player()
- player.x = x_max / 2
- player.y = y_max
- player.x_vel = 0
- player.y_vel = 0
- player.health = max_health
- player.jumping = false
- player.grounded = false
- player.invuln_timer = 0
- player.heal_timer = 0
+function initialize_players()
+ players = {}
+ for i=1,n_players do
+  player = {}
+  player.y = y_max
+  player.x_vel = 0
+  player.y_vel = 0
+  player.health = max_health
+  player.jumping = false
+  player.grounded = false
+  player.invuln_timer = 0
+  player.heal_timer = 0
+  players[#players + 1] = player
+ end
+ if n_players == 1 then
+  players[1].x = x_max / 2
+ else
+  players[1].x = x_max / 3
+  players[2].x = 2 * x_max / 3
+ end
 end
 
 function initialize_fruits()
@@ -154,7 +215,7 @@ function spawn_fruit()
  fruits[#fruits + 1] = fruit
 end
 
-function heal()
+function heal(player)
  player.health = player.health + 1
  player.heal_timer = 0
 end
@@ -164,13 +225,15 @@ function update_timers()
  if frames_alive % fruit_spawn_frames == 0 then
   spawn_fruit()
  end
- if player.invuln_timer > 0 then
-  player.invuln_timer = player.invuln_timer - 1
- end
- if player.health < max_health then
-  player.heal_timer = player.heal_timer + 1
-  if player.heal_timer == heal_frames then
-   heal()
+ for i, player in pairs(players) do
+  if player.invuln_timer > 0 then
+   player.invuln_timer = player.invuln_timer - 1
+  end
+  if player.health < max_health then
+   player.heal_timer = player.heal_timer + 1
+   if player.heal_timer == heal_frames then
+    heal(player)
+   end
   end
  end
 end
@@ -183,11 +246,18 @@ function draw_border()
 end
 
 function draw_health()
- health_x = health_gui_x
+ draw_player_health(health_gui_x, players[1], 12)
+ if n_players == 2 then
+  health_x_2 = x_max + 8 - health_gui_x - max_health * (health_gui_size + 1)
+  draw_player_health(health_x_2, players[2], 11)
+ end
+end
+
+function draw_player_health(health_x, player, color)
  for i=1,player.health do
   rectfill(health_x, health_gui_y,
            health_x + health_gui_size - 1,
-           health_gui_y + health_gui_size - 1, 8)
+           health_gui_y + health_gui_size - 1, color)
   health_x = health_x + health_gui_size + 1
  end
 end
@@ -215,8 +285,15 @@ function draw_fruits()
  end
 end
 
-function draw_player()
- player_sprite = 51 + flr(player.heal_timer / heal_frames * 9)
+function draw_players()
+ draw_player(players[1], 35)
+ if n_players == 2 then
+  draw_player(players[2], 51)
+ end
+end
+
+function draw_player(player, sprite_num)
+ player_sprite = sprite_num + flr(player.heal_timer / heal_frames * 9)
  if player.invuln_timer > 0 then
   if flr(player.invuln_timer / 2) % 2 == 0 then
    spr(player_sprite, player.x, player.y)
@@ -226,33 +303,40 @@ function draw_player()
  end
 end
 
-function movement_input()
- g_up_down = (g_dir == up) or (g_dir == down)
- if btn(left) and g_up_down then
-  player.x_vel = 0
-  player.x = player.x - move_speed
- end
- if btn(right) and g_up_down then
-  player.x_vel = 0
-  player.x = player.x + move_speed
- end
- if btn(up) and not g_up_down then
-  player.y_vel = 0
-  player.y = player.y - move_speed
- end
- if btn(down) and not g_up_down then
-  player.y_vel = 0
-  player.y = player.y + move_speed
- end
- if player.jumping and not btn(4) then
-  cut_jump()
- end
- if btnp(4) and player.grounded then
-  jump()
+function movement_inputs()
+ movement_input(players[1], 0)
+ if n_players == 2 then
+  movement_input(players[2], 1)
  end
 end
 
-function jump()
+function movement_input(player, player_num)
+ g_up_down = (g_dir == up) or (g_dir == down)
+ if btn(left, player_num) and g_up_down then
+  player.x_vel = 0
+  player.x = player.x - move_speed
+ end
+ if btn(right, player_num) and g_up_down then
+  player.x_vel = 0
+  player.x = player.x + move_speed
+ end
+ if btn(up, player_num) and not g_up_down then
+  player.y_vel = 0
+  player.y = player.y - move_speed
+ end
+ if btn(down, player_num) and not g_up_down then
+  player.y_vel = 0
+  player.y = player.y + move_speed
+ end
+ if player.jumping and not btn(4, player_num) then
+  cut_jump(player)
+ end
+ if btnp(4, player_num) and player.grounded then
+  jump(player)
+ end
+end
+
+function jump(player)
  player.jumping = true
  player.grounded = false
  if g_dir == left then
@@ -269,7 +353,7 @@ function jump()
  end 
 end
 
-function cut_jump()
+function cut_jump(player)
  if g_dir == left and player.x_vel > 0 then
   player.x_vel = 0
  end
@@ -285,6 +369,13 @@ function cut_jump()
 end
 
 function apply_gravity()
+ apply_gravity_to_player(players[1])
+ if n_players == 2 then
+  apply_gravity_to_player(players[2])
+ end
+end
+
+function apply_gravity_to_player(player)
  if g_dir == left then
   player.x_vel = player.x_vel + g
  end
@@ -305,33 +396,33 @@ function apply_gravity()
   player.x = x_min
   player.x_vel = 0
   if g_dir == left then
-   land()
+   land(player)
   end
  end
  if player.x > x_max then
   player.x = x_max
   player.x_vel = 0
   if g_dir == right then
-   land()
+   land(player)
   end
  end
  if player.y < y_min then
   player.y = y_min
   player.y_vel = 0
   if g_dir == up then
-   land()
+   land(player)
   end
  end
  if player.y > y_max then
   player.y = y_max
   player.y_vel = 0
   if g_dir == down then
-   land()
+   land(player)
   end
  end
 end
 
-function land()
+function land(player)
  player.grounded = true
  player.jumping = false
  -- friction
@@ -353,35 +444,55 @@ function fruits_fall()
  end
 end
 
-function hurt_player()
+function hurt_player(player, player_number)
  if player.invuln_timer == 0 then
   player.health = player.health - 1
   if player.health == 0 then
-   die()
+   die(player_number)
   end
+  all_players_invuln()
+ end
+end
+
+function all_players_invuln()
+ for i, player in pairs(players) do
   player.invuln_timer = invuln_frames
  end
 end
 
-function die()
- game_over = true
+function die(player_number)
+ winner = 3 - player_number
+ scene = game_over
 end
 
 function check_collisions()
+ check_collisions_for_player(players[1], 1)
+ if n_players == 2 then
+  check_collisions_for_player(players[2], 2)
+ end
+end
+
+function check_collisions_for_player(player, player_number)
  for i,v in pairs(fruits) do
   if player.invuln_timer == 0 then
-   if not v.eaten and collide_with_player(v.x, v.y) then
-    eat_fruit(v)
+   if not v.eaten and collide_with_player(v.x, v.y, player) then
+    eat_fruit(v, player, player_number)
    end
   end
  end
 end
 
-function eat_fruit(fruit)
- hurt_player()
+function eat_fruit(fruit, player, player_number)
+ hurt_player(player, player_number)
  fruit.eaten = true
  if fruit.type <= down then
   g_dir = fruit.type
+  all_players_airborn()
+ end
+end
+
+function all_players_airborn()
+ for i, player in pairs(players) do
   player.grounded = false
  end
 end
@@ -401,7 +512,7 @@ function intersect(min1, max1, min2, max2)
          min(min1,max1) < max(min2,max2)
 end
 
-function collide_with_player(x, y)
+function collide_with_player(x, y, player)
  x_intersect = intersect(player.x, player.x+8, x, x+8)
  y_intersect = intersect(player.y, player.y+8, y, y+8)
  return x_intersect and y_intersect
@@ -424,22 +535,22 @@ __gfx__
 00000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000cccccc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000cccccccc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00050000ccaccacc0000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00550000cccccccc0000550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-05555555ccaccacc5555555000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00550000ccaaaacc0000550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00050000cccccccc0000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000cccccc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000050000000000000cccccc00cccccc008ccccc0088cccc00888ccc008888cc0088888c0088888800888888000000000000000000000000000000000
-000000000005000000000000cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
-000000000005000000000000ccaccacc8caccacc88accacc88accacc88a8cacc88a88acc88a88acc88a88a8c88a88a8800000000000000000000000000000000
-000000000005000000000000cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
-000000000555550000000000ccaccacc8caccacc88accacc88accacc88a8cacc88a88acc88a88acc88a88a8c88a88a8800000000000000000000000000000000
-000000000055500000000000ccaaaacc8caaaacc88aaaacc88aaaacc88aaaacc88aaaacc88aaaacc88aaaa8c88aaaa8800000000000000000000000000000000
-000000000005000000000000cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
 0000000000000000000000000cccccc00cccccc008ccccc0088cccc00888ccc008888cc0088888c0088888800888888000000000000000000000000000000000
+000000000000000000000000cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
+000500000000000000005000ccaccacc8caccacc88accacc88accacc88a8cacc88a88acc88a88acc88a88a8c88a88a8800000000000000000000000000000000
+005500000000000000005500cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
+055555550000000055555550ccaccacc8caccacc88accacc88accacc88a8cacc88a88acc88a88acc88a88a8c88a88a8800000000000000000000000000000000
+005500000000000000005500ccaaaacc8caaaacc88aaaacc88aaaacc88aaaacc88aaaacc88aaaacc88aaaa8c88aaaa8800000000000000000000000000000000
+000500000000000000005000cccccccc8ccccccc88cccccc888ccccc8888cccc88888ccc888888cc8888888c8888888800000000000000000000000000000000
+0000000000000000000000000cccccc00cccccc008ccccc0088cccc00888ccc008888cc0088888c0088888800888888000000000000000000000000000000000
+0000000000050000000000000bbbbbb00bbbbbb008bbbbb0088bbbb00888bbb008888bb0088888b0088888800888888000000000000000000000000000000000
+000000000005000000000000bbbbbbbb8bbbbbbb88bbbbbb888bbbbb8888bbbb88888bbb888888bb8888888b8888888800000000000000000000000000000000
+000000000005000000000000bb7bb7bb8b7bb7bb887bb7bb887bb7bb8878b7bb887887bb887887bb8878878b8878878800000000000000000000000000000000
+000000000005000000000000bbbbbbbb8bbbbbbb88bbbbbb888bbbbb8888bbbb88888bbb888888bb8888888b8888888800000000000000000000000000000000
+000000000555550000000000bb7bb7bb8b7bb7bb887bb7bb887bb7bb8878b7bb887887bb887887bb8878878b8878878800000000000000000000000000000000
+000000000055500000000000bb7777bb8b7777bb887777bb887777bb887777bb887777bb887777bb8877778b8877778800000000000000000000000000000000
+000000000005000000000000bbbbbbbb8bbbbbbb88bbbbbb888bbbbb8888bbbb88888bbb888888bb8888888b8888888800000000000000000000000000000000
+0000000000000000000000000bbbbbb00bbbbbb008bbbbb0088bbbb00888bbb008888bb0088888b0088888800888888000000000000000000000000000000000
 __label__
 333333333333333333333333333333333333bbbb333333333333333333333333333333333333333333333333333333333333333333ffff333333333333333333
 90000000000000000ffff000000000000008888880000000000000000000000000000000000000000000000000000000000000000ffffff0000000000000000f
